@@ -193,3 +193,23 @@ Whisper 在静音处会幻觉出「ご視聴ありがとうございました」
 - 跨 `await` 用共享临时画布 → 被别的绘制覆盖
 ⇒ 所有"按名字取资源"的地方都要在启动时打印一次实际命中项。
 
+### 铁律 24：Blender 5.x 的 API 断层（实测清单）
+升级到 5.x 后这些会**静默失效或直接报错**，逐条核对：
+
+| 旧写法 | 5.x 写法 |
+|---|---|
+| `BLENDER_EEVEE_NEXT` | `BLENDER_EEVEE` |
+| `scene.node_tree` | `scene.compositing_node_group` |
+| `CompositorNodeComposite` | `NodeGroupOutput` + `ng.interface.new_socket(...)` |
+| 先设 `file_format` 再设 `media_type` | **先 `media_type='IMAGE'`，再 `file_format`** |
+| `g.threshold = x`（Glare） | 全是 input socket：`g.inputs['Type'].default_value = 'Bloom'` |
+| `Action.fcurves` | `action_get_channelbag_for_slot(...).fcurves` |
+| GP 对象 `bpy.data.grease_pencils.new()` 后直接赋材质 | 还要 `materials.create_gpencil_data(mat)` |
+| LineArt modifier 的 `thickness` | 是 **`radius`**，且 `target_layer` 是字符串 |
+| EEVEE 世界体积 | **无限** ⇒ 天空变黑、太阳被掐灭；用有限的 `volume_box` |
+| 变量字体 | **只加载默认实例**（Noto Sans JP VF = Thin！）⇒ 必须用**静态字重**文件 |
+
+### 铁律 25：GPU 不能同时被两边抢
+浏览器渲染器在跑的时候同时渲 Blender ⇒ **慢 5–20 倍**（实测 Cycles 从 0.66 掉到 12–31 s/帧）。
+⇒ 渲 3D 前先看 `nvidia-smi`，两个渲染任务**串行**，不要并行。
+
