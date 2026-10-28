@@ -3,9 +3,9 @@ name: mv-playbook
 slug: mv-playbook
 displayName: "MV Playbook (MV 知识库入口·累积规则)"
 category: video
-version: 1.0.0
-description: "The entry point to the accumulated MV skill family: a map of which skill governs what, plus the cross-cutting hard rules that were paid for with real mistakes (a parameter tweak invisible on 8-bit footage, a metric poisoned by grain, per-phrase subtitle reveals inviting sync-checking, an unreliable lyric timeline, a metric that answers the wrong question). Use this before starting any MV task, when unsure which skill applies, or when adding a new lesson and deciding where it belongs."
-description_zh: "MV 技能家族的入口：哪条线归哪个技能管，加上跨项目通用的硬教训（8bit 素材上看不见的参数微调、被颗粒污染的指标、逐段出字等于请观众核对、不可信的歌词时间轴、问错问题的判据）。开工前先读，不确定该用哪个技能时读，或者学到新东西要决定写进哪里时读。"
+version: 1.1.0
+description: "The entry point to the accumulated MV skill family: a map of which skill governs what, plus the cross-cutting hard rules that were paid for with real mistakes (a parameter tweak invisible on 8-bit footage, a metric poisoned by grain, a metric that answers the wrong question, three different sharpness metrics all pointing the wrong way on the same batch, how to prove your own pipeline did not soften a deliverable). Use this before starting any MV task, when unsure which skill applies, or when adding a new lesson and deciding where it belongs."
+description_zh: "MV 技能家族的入口：哪条线归哪个技能管，加上跨项目通用的硬教训（8bit 素材上看不见的参数微调、被颗粒污染的指标、问错问题的判据、同一天三把清晰度尺子全部指反、怎么证明不是自己的后处理把交付图弄糊的）。开工前先读，不确定该用哪个技能时读，或者学到新东西要决定写进哪里时读。"
 agent_created: true
 ---
 
@@ -18,6 +18,7 @@ agent_created: true
 | **开工前**、不确定用哪个 | **`mv-playbook`（本文件）** |
 | 整片结构怎么组织（几族镜头 / 文字几段 / 世界连不连） | `mv-pv-arrangement` |
 | **要出多少张角色/背景图、怎么不漂脸** | `mv-character-assets` |
+| **图糊了 / 怀疑是自己处理弄糊的** | `mv-image-forensics` |
 | 日文字幕断句 / 出字时刻 / 排版参数 | `mv-jp-lyrics-subtitle` |
 | 从零做一支 MV 的流水线 | `mv-code-driven-pipeline` |
 | 审一支成片 / 反解参考片 | `mv-shot-audit` |
@@ -56,6 +57,19 @@ agent_created: true
 - **整体 bbox 量角色高**：漂浮的装饰件会拉大 bbox ⇒ 必须用**最大连通域**。
 - **能量峰数音节**：一个长音里的颤音产生多个峰 ⇒ 16 个音节数出 33 个峰。
 ⇒ 换判据前先做**阳性对照**：拿一个已知异常的样本，判据必须命中。
+
+⭐ **2026-10-28 升级（这条比上面三条更狠）**：**单图绝对量测不出两图相对判断。**
+同一天三把原理完全不同的清晰度尺子**同时崩**，方向全反：
+
+| 尺子 | 报了什么 | 病根 |
+|---|---|---|
+| 归一化拉普拉斯方差 | 最糊的 F2 = **1.64×** 锚图（"最清晰"） | 高饱和橘发 + 纯绿幕撑起方差 |
+| 径向频谱悬崖 | 锚图 0.126 ＞ 新图 0.077 | 锚图 2.07MP ＞ 新图 1.57MP ⇒ 测的是"图多大" |
+| 内线锐边% | 新图 **43%** vs 锚图 12%（"更锐"） | 量到的是键控**噪点** |
+
+⇒ **两张图不是同一条处理链出来的，任何指标比的都是"处理链差异"，不是"锐度差异"。**
+⇒ 想让自动指标可用：**同一张源图分别过两条待比较的处理链，再比指标。**
+⇒ 细节与可复用脚本见 `mv-image-forensics`。
 
 ### 铁律 4：动手前先 grep 项目里的既定规格
 字号、色板、线宽、有无底板——这些往往**早就裁定过**，躺在 `02_文档/` 或 `docs/` 里。
@@ -125,7 +139,9 @@ grep -rn -E "字幕|字体|排版|几何|字高|描边|底板|色板" docs/ 02_�
 ## 4. 当前状态
 
 - 2026-10-24 建立。同日新增 `mv-pv-arrangement`、`mv-jp-lyrics-subtitle`、`blender-editable-timeline`。
-- 跨线铁律 11 条，全部有实测支撑。
+- 2026-10-24 第 2–4 轮 research ⇒ 铁律 12–34（§2b）。
+- 2026-10-28 图片质量取证 ⇒ **`mv-image-forensics`** + 铁律 35–38（§2c），并升级铁律 3。
+- 跨线铁律 **38 条**，全部有实测支撑。
 - ⛔ 本文件是**索引 + 铁律**，不要往这里塞细节——细节进对应 skill。
 
 ---
@@ -274,3 +290,41 @@ Whisper 在静音处会幻觉出「ご視聴ありがとうございました」
 
 ⇒ 对我们：**LunaPet 若上 Steam，AI 出的角色图必须披露。这是立项级决策，不是发版前才想的事。**
 ⛔ 结论不要写成"技术可行"，要写成"技术可行 + 商业代价已量化"。
+
+---
+
+## 2c. 补充铁律（2026-10-28 · 图片质量取证）
+
+### 铁律 35：判「糊不糊」只有一把尺子 —— 同尺度 1:1 目检
+⛔ 任何自动清晰度指标都不算数（见铁律 3 的三把全崩表）。
+**做法**：角色高归一到同一值 → 以**原像素 1:1** 裁同一区域并排，⛔ 不许把小块再放大（LANCZOS 会把软边补成假锐边）。
+**再补一步**：压到**成片角色高**看第二次。缩小会掩盖软 ⇒ 压下去还看得出，就必须返工。
+实测换算：`FRAMING["FULL"]=0.90` ⇒ 成片角色高 ≈ `0.90 × 1080 / 0.8839 ≈ 1100`；
+素材 1589~1778 ⇒ 进片 0.62~0.74×（缩小）。压到 1100 后 F2/F3 仍一眼比锚图软。
+细节：`mv-image-forensics`。
+
+### 铁律 36：判「是谁弄糊的」用逐位 diff，⛔ 不用指标
+- 指标里根本没有"谁改的"这个信息。用指标答责任问题，只会编出假根因。
+- **第一步永远是找原始档 —— 它通常就写在你自己的交付脚本里**（`grep -n "RAW\|SRC\|INPUT" <deliver>.py`）。
+  ⛔ 我因为没读脚本，下了「原始档没留」的错误结论，再据此编出「被放大 1.03~1.16×」的假根因，两条都被推翻。
+- **口径**：只在**共同前景 mask 内**统计（⛔ 不统计全图，背景键控差异会淹没角色）。
+- **实测**：源 vs 交付前景内 `diff==0` 占 **97.3%~99.0%**，而全图 `diff>8` 占 **76.6%**（全在绿幕上）
+  ⇒ 后处理对角色像素零损伤。
+- 顺手核缩放：**比尺寸，⛔ 不比角色高比值**（角色高会因裁切/补边而变，尺寸不会）。
+
+### 铁律 37：比 md5 之前先锁**全部**条件
+`--still 44.0` 与 `--still 44.0 --cam-json camB` 是**两个不同的哈希**：
+
+| 条件 | 值 |
+|---|---|
+| 44.0（无 cam） | `b47a2582e2309cb1e595ff3bd29bcabd` |
+| 44.0 + camB | `da3b4c82b106faf67aaa9d8d2306f733` |
+
+⇒ 我拿前者比后者，误报了「基线漂移」。**任何"哈希变了/没变"的结论，先列出两边的全部参数。**
+配套：**生产文件单实例无锁、多端并发写**（实测一小时变三次 md5）⇒ 比对前先记快照（行数 + md5 + mtime）。
+
+### 铁律 38：派单必须落盘成 md
+2026-10-28 的 `LU01` 派单**没落盘**，事后连"我当时写的 prompt 里有没有『柔和低对比』"都查不到
+⇒ 「是 prompt 要了软，还是模型自己软」这条永远判不了。
+⭐ **prompt 是可复现性的一部分，和代码同等重要。** 派单落盘 = 唯一的留痕。
+
