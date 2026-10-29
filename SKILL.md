@@ -3,9 +3,9 @@ name: mv-playbook
 slug: mv-playbook
 displayName: "MV Playbook (MV 知识库入口·累积规则)"
 category: video
-version: 1.1.0
-description: "The entry point to the accumulated MV skill family: a map of which skill governs what, plus the cross-cutting hard rules that were paid for with real mistakes (a parameter tweak invisible on 8-bit footage, a metric poisoned by grain, a metric that answers the wrong question, three different sharpness metrics all pointing the wrong way on the same batch, how to prove your own pipeline did not soften a deliverable). Use this before starting any MV task, when unsure which skill applies, or when adding a new lesson and deciding where it belongs."
-description_zh: "MV 技能家族的入口：哪条线归哪个技能管，加上跨项目通用的硬教训（8bit 素材上看不见的参数微调、被颗粒污染的指标、问错问题的判据、同一天三把清晰度尺子全部指反、怎么证明不是自己的后处理把交付图弄糊的）。开工前先读，不确定该用哪个技能时读，或者学到新东西要决定写进哪里时读。"
+version: 1.2.0
+description: "The entry point to the accumulated MV skill family: a map of which skill governs what, plus the cross-cutting hard rules that were paid for with real mistakes (a parameter tweak invisible on 8-bit footage, a metric poisoned by grain, a metric that answers the wrong question, three different sharpness metrics all pointing the wrong way on the same batch, how to prove your own pipeline did not soften a deliverable, a pass/fail metric whose sampling window silently avoided the worst object in the frame, and a dispatch requirement the anchor image never had). Use this before starting any MV task, when unsure which skill applies, or when adding a new lesson and deciding where it belongs."
+description_zh: "MV 技能家族的入口：哪条线归哪个技能管，加上跨项目通用的硬教训（8bit 素材上看不见的参数微调、被颗粒污染的指标、问错问题的判据、同一天三把清晰度尺子全部指反、怎么证明不是自己的后处理把交付图弄糊的、取样区悄悄避开了画面里最差物体的判据、派单要求的特征锚图里根本没有）。开工前先读，不确定该用哪个技能时读，或者学到新东西要决定写进哪里时读。"
 agent_created: true
 ---
 
@@ -21,6 +21,7 @@ agent_created: true
 | **图糊了 / 怀疑是自己处理弄糊的** | `mv-image-forensics` |
 | 日文字幕断句 / 出字时刻 / 排版参数 | `mv-jp-lyrics-subtitle` |
 | 从零做一支 MV 的流水线 | `mv-code-driven-pipeline` |
+| **素材还没出，要先看整片长什么样** | `mv-code-driven-pipeline` 的 `docs/previz-blockout.md` |
 | 审一支成片 / 反解参考片 | `mv-shot-audit` |
 | 角色跨帧/跨姿势保持一致 | `consistent-character-mv-anchor` |
 | 派单给美术端 / 裁决回传 | `pet-asset-pipeline` |
@@ -105,44 +106,6 @@ grep -rn -E "字幕|字体|排版|几何|字高|描边|底板|色板" docs/ 02_�
 
 ### 铁律 11：宁可写「有 N 项待修」，不写「基本完成」
 ⛔ "基本完成"是自欺。列出不合格项，逐项给实测值。
-
----
-
-## 3. 累积流程（学到新东西往哪写）
-
-每学到一条，走这三步：
-
-1. **归位**：它属于哪个 skill？
-   - 结构/编排 → `mv-pv-arrangement`
-   - 字幕/文字 → `mv-jp-lyrics-subtitle`
-   - 一致性/素材 → `consistent-character-mv-anchor`
-   - 交付/工程 → `blender-editable-timeline`
-   - 派单/裁决 → `pet-asset-pipeline`
-   - **跨线通用** → 本文件 §2 铁律
-2. **变成可执行**：写成「症状 → 根因 → 修法 → 实测数字」。
-   ⛔ 不写「注意 XX 可能有问题」这种没用的提醒。
-3. **进反面清单**：凡是我试过且失败的，写进对应 skill 的「别再试」区。
-   失败的经验比成功的更值钱，因为它能省掉下一次的重复踩。
-
-### 判断标准：一条好条目长什么样
-
-| 差 | 好 |
-|---|---|
-| 「注意通道可能冲突」 | 「给 ch3 赋值时 char 被静默推到 89..177 帧，整段消失」 |
-| 「字幕可能不同步」 | 「句标 19.50 起，实测 23.63，早 4.1 秒」 |
-| 「颗粒会影响判据」 | 「σ2.8 颗粒把拉普拉斯方差抬高，B1 647 vs 原片 382，判据失效」 |
-
-**没有数字的经验不算经验。**
-
----
-
-## 4. 当前状态
-
-- 2026-10-24 建立。同日新增 `mv-pv-arrangement`、`mv-jp-lyrics-subtitle`、`blender-editable-timeline`。
-- 2026-10-24 第 2–4 轮 research ⇒ 铁律 12–34（§2b）。
-- 2026-10-28 图片质量取证 ⇒ **`mv-image-forensics`** + 铁律 35–38（§2c），并升级铁律 3。
-- 跨线铁律 **38 条**，全部有实测支撑。
-- ⛔ 本文件是**索引 + 铁律**，不要往这里塞细节——细节进对应 skill。
 
 ---
 
@@ -328,3 +291,131 @@ Whisper 在静音处会幻觉出「ご視聴ありがとうございました」
 ⇒ 「是 prompt 要了软，还是模型自己软」这条永远判不了。
 ⭐ **prompt 是可复现性的一部分，和代码同等重要。** 派单落盘 = 唯一的留痕。
 
+---
+
+## 2d. 补充铁律（2026-10-29 · 整片预演与判据取样）
+
+### 铁律 39：⛔ 判据的**取样区**比判据本身更容易错 —— 取样区必须包含「该判据要否定的最坏样本」
+
+**症状**：判据要求「门板必须虚」。美术端测出**门板梯度只有手指的 7.3%**（2.94 vs 40.39），
+判断为完美过关。我按同口径复算，也是 5%~7%。三方一致。
+
+**实际**：门根本是实的。把**门把手**算进取样区重测：
+
+| 版本 | 门把手区 p99 | 手指区 p99 | 把手 / 手指 |
+|---|---|---|---|
+| a 版 | 27.0 | 39.6 | **0.68** |
+| b 版 | 31.3 | 38.2 | **0.82** |
+
+⇒ 门把手和手指**同样锐**，门把手甚至是画面里最抢眼的元素。
+
+**根因**：取样区选的是「最右 1/8 × 纵 33–66%」——一块**纯色门板中间**。
+这个位置**自动避开了画面里唯一有高频结构的东西（门把手 + 门框线）**。
+判据不是在测"门虚不虚"，是在测"纯色区域有多平"。
+
+**修法**：写任何 pass/fail 判据时，强制回答一个问题：
+> **如果这个缺陷真的存在，它会出现在我取样的那几块像素里吗？**
+
+答不上来 ⇒ 取样区定义错了。判据必须覆盖**最坏样本**，不能只覆盖"好样本"。
+
+⚠️ 同一个病在别处也犯过：`_resmap.py` 拿全图口径量角色高，被绿幕像素污染；
+`_flatness.py` 把绿幕当皮肤。**都是"取样区把要测的东西和不该测的东西混在一起或干脆排除掉"。**
+
+### 铁律 40：⛔ 「面积占比」口径对稀疏亮点必败（用分位数差，别假设亮部面积）
+
+**症状**：判据「最亮 1% 的平均亮度 / 中位亮度 ≥ 3×」。一张图反复不过。
+
+**根因**：那张全图亮度 ≥200 的像素只有 **230 个 = 0.011%**。
+用"top-N 平均"去代表它，等于**拿噪声当信号**。
+有人建议「改 0.1% 档就全过了」并报出 3.06×；我复算 **2.959×**，仍不过。
+（顺带：他报的数本身就不对 —— 转述的数字一律自己复算。）
+
+**修法**：不要假设亮部占多少面积。改用**分位数差**：
+
+```
+判据：P99.9 − P50 ≥ 70      # 8bit 亮度
+```
+
+六张回归：109.9 / 119.5 / 127.3 / 160.0 / 181.6 / 188.8 —— 全过。
+次日同一判据跑四张新图：135 / 136 / 138 / 150 —— 全过，且不需要调阈值。
+
+⭐ 通用形状：**凡是"取前 N% 求平均"的判据，先问 N% 里到底有没有东西。**
+没有 ⇒ 换分位数差 / 最大值 / 绝对计数，别换档位。
+
+### 铁律 41：⛔ 派单要求必须在**锚图里指得出来** —— 否则模型永远做不到
+
+**症状**：连续 **4 次**生成（两轮各 a/b 两版）都没做到两项要求：
+「猫耳向后压」「马尾藏到肩后不可见」。prompt 原句照抄，模型不响应。
+每一轮美术端都如实报「这条没修上」，我每一轮都当成"执行不到位"。
+
+**根因**：翻回锚图看 —— **锚图本身耳朵只是略外斜、马尾就垂在画面左侧**。
+⇒ 我要求的是**锚图里根本不存在的特征**。
+模型不是不听话，是照着锚图走。这是**派单错误**，不是执行错误，也不是模型缺陷。
+
+**修法**：写 prompt 前先把锚图量一遍。
+每一条"要改成什么样"必须能在锚图上**指出来位置**。
+指不出来 ⇒ 要改的不是这一张图，是**锚图本身**（先出一张带该特征的新锚，再派生）。
+⛔ 不要用 prompt 让模型无中生有一个参考图里没有的解剖特征。
+
+⚠️ 这条的代价：4 次生成 + 两轮往返，全部为零。而且我两次把责任归给执行端。
+
+### 铁律 42：⛔ 两张图比"谁大谁小"，必须先把尺度归一
+
+**症状**：拿**全身立绘**（锚图）和**近景生成图**直接并排，得出
+「生成的猫耳明显大于锚图，接近脸宽的一半」，并要求返工。
+
+**实测**：两张的脸宽差 **2.3 倍**（143 px vs 331 px）。
+按脸宽归一到同宽后重测**耳宽 / 脸宽**：
+
+| | 耳宽/脸宽 |
+|---|---|
+| 锚图 | **0.42** |
+| 生成版 | **0.31** |
+
+⇒ **方向反了：生成版的耳朵相对脸更小。** 视觉上觉得"大"，是因为绒毛面积大、耳廓立体，不是尺寸。
+
+**根因**：与铁律 3 的同族 —— **尺子没对准，量出来的都是尺度差**。
+
+**修法**：比之前先定一个明确基准（脸宽 / 角色高 / 瞳距），把两张缩到同一基准再比。
+⚠️ 基准本身也要验：本次肤色 mask 漏掉了被头发遮住的半边脸，脸宽偏小约 15%，
+所以 0.31 这个数仍然偏大（真实约 0.26~0.31），但**不影响方向判断**。
+
+---
+
+## 3. 累积流程（学到新东西往哪写）
+
+每学到一条，走这三步：
+
+1. **归位**：它属于哪个 skill？
+   - 结构/编排 → `mv-pv-arrangement`
+   - 字幕/文字 → `mv-jp-lyrics-subtitle`
+   - 一致性/素材 → `consistent-character-mv-anchor`
+   - 交付/工程 → `blender-editable-timeline`
+   - 派单/裁决 → `pet-asset-pipeline`
+   - **跨线通用** → 本文件 §2 铁律
+2. **变成可执行**：写成「症状 → 根因 → 修法 → 实测数字」。
+   ⛔ 不写「注意 XX 可能有问题」这种没用的提醒。
+3. **进反面清单**：凡是我试过且失败的，写进对应 skill 的「别再试」区。
+   失败的经验比成功的更值钱，因为它能省掉下一次的重复踩。
+
+### 判断标准：一条好条目长什么样
+
+| 差 | 好 |
+|---|---|
+| 「注意通道可能冲突」 | 「给 ch3 赋值时 char 被静默推到 89..177 帧，整段消失」 |
+| 「字幕可能不同步」 | 「句标 19.50 起，实测 23.63，早 4.1 秒」 |
+| 「颗粒会影响判据」 | 「σ2.8 颗粒把拉普拉斯方差抬高，B1 647 vs 原片 382，判据失效」 |
+
+**没有数字的经验不算经验。**
+
+---
+
+## 4. 当前状态
+
+- 2026-10-24 建立。同日新增 `mv-pv-arrangement`、`mv-jp-lyrics-subtitle`、`blender-editable-timeline`。
+- 2026-10-24 第 2–4 轮 research ⇒ 铁律 12–34（§2b）。
+- 2026-10-28 图片质量取证 ⇒ **`mv-image-forensics`** + 铁律 35–38（§2c），并升级铁律 3。
+- 2026-10-29 整片色块预演 ⇒ `mv-code-driven-pipeline` 新增 **`docs/previz-blockout.md`**（七条铁律第 7 条 + 阶段 4.5），
+  本文件铁律 **39–42**（§2d）：取样区污染 / 面积口径必败 / 派单要求须锚图可指 / 两图比较先归尺。
+- 跨线铁律 **42 条**，全部有实测支撑。
+- ⛔ 本文件是**索引 + 铁律**，不要往这里塞细节——细节进对应 skill。
